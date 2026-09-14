@@ -82,14 +82,33 @@ The demo does not need a Clay, HubSpot, OpenAI, or paid enrichment account. It w
 - `artifacts/processed_prospects.json`
 - `artifacts/summary.json`
 
+## Run the HTTP service used by n8n
+
+The repository includes a small FastAPI adapter over the same scoring and CRM code used by the offline demo. From the repository root:
+
+```bash
+python -m pip install -e ".[dev]"
+python -m gtm_engine.api
+```
+
+Health check: `GET http://localhost:8000/health`
+
+The n8n workflow expects:
+
+- `GTM_ENGINE_SCORE_URL=http://localhost:8000/score`
+- `GTM_CRM_UPSERT_URL=http://localhost:8000/crm/upsert`
+
+The safe default is `GTM_CRM_MODE=mock`. Set `GTM_CRM_MODE=hubspot` and provide `HUBSPOT_ACCESS_TOKEN` only when intentionally testing a real CRM.
+
 ## Connect the real GTM stack
 
-1. Build the Clay workbook/table described in [`docs/clay-setup.md`](docs/clay-setup.md).
-2. Import [`n8n/gtm-revenue-engine.workflow.json`](n8n/gtm-revenue-engine.workflow.json).
-3. Configure n8n environment variables for the scoring and CRM service endpoints.
-4. Create the custom CRM fields mapped in [`docs/crm-mapping.md`](docs/crm-mapping.md).
-5. Test with non-production data, including replay and duplicate-delivery cases.
-6. Activate the workflow only after the failure-mode checks in [`docs/runbook.md`](docs/runbook.md) pass.
+1. Start the HTTP service above and verify `/health`.
+2. Build the Clay workbook/table described in [`docs/clay-setup.md`](docs/clay-setup.md).
+3. Import [`n8n/gtm-revenue-engine.workflow.json`](n8n/gtm-revenue-engine.workflow.json).
+4. Configure the n8n environment variables from [`.env.example`](.env.example).
+5. Create the custom CRM fields mapped in [`docs/crm-mapping.md`](docs/crm-mapping.md).
+6. Test with non-production data, including replay and duplicate-delivery cases.
+7. Activate the workflow only after the failure-mode checks in [`docs/runbook.md`](docs/runbook.md) pass.
 
 ## Repository map
 
@@ -99,7 +118,7 @@ data/          safe sample prospects and enriched examples
 docs/          architecture, Clay setup, CRM mapping, failure modes, handoff, runbook
 n8n/           sanitized importable orchestration workflow
 scripts/       one-command PowerShell demo
-src/gtm_engine deterministic transformation, scoring, routing, CRM, CLI code
+src/gtm_engine deterministic transformation, scoring, routing, CRM, CLI and FastAPI code
 tests/         behavior and repository contract tests
 ```
 

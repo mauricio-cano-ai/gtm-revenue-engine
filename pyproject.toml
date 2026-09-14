@@ -12,6 +12,8 @@ dependencies = [
   "pydantic>=2.8",
   "PyYAML>=6.0",
   "requests>=2.31",
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +21,7 @@ dev = ["pytest>=8.0"]
 
 [project.scripts]
 gtm-engine = "gtm_engine.cli:main"
+gtm-api = "gtm_engine.api:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

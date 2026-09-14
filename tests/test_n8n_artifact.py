@@ -39,3 +39,10 @@ def test_workflow_uses_environment_driven_endpoints():
     raw = WORKFLOW.read_text(encoding="utf-8")
     assert "$env.GTM_ENGINE_SCORE_URL" in raw
     assert "$env.GTM_CRM_UPSERT_URL" in raw
+
+
+def test_env_example_wires_n8n_to_local_api_endpoints():
+    env_text = Path(".env.example").read_text(encoding="utf-8")
+    assert "GTM_ENGINE_SCORE_URL=http://localhost:8000/score" in env_text
+    assert "GTM_CRM_UPSERT_URL=http://localhost:8000/crm/upsert" in env_text
+    assert "GTM_CRM_MODE=mock" in env_text
