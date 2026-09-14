@@ -1,0 +1,15 @@
+[
+  {
+    "company_name": "Northstar Analytics",
+    "domain": "northstar-analytics.example",
+    "source": "clay",
+    "firmographic_fit": 1.0,
+    "technographic_fit": 1.0,
+    "hiring_signal": 0.9,
+    "funding_signal": 0.8,
+    "intent_signal": 1.0,
+    "behavioral_signal": 0.9,
+    "research_summary": "Scaling sales team and investing in RevOps",
+    "buying_trigger": "Hiring growth ops and increased high-intent activity"
+  }
+]

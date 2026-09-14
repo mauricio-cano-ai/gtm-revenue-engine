@@ -1,0 +1,379 @@
+{
+  "name": "GTM Revenue Engine - Clay to CRM",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gtm/clay/prospect",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Clay Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        0
+      ],
+      "webhookId": "gtm-revenue-engine-clay"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\nconst rawDomain = String(body.domain ?? '').trim().toLowerCase();\nconst domain = rawDomain.replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0] || null;\nconst companyName = String(body.company_name ?? '').trim() || null;\nconst valid = Boolean(domain || companyName);\nconst identity = domain || companyName.toLowerCase().replace(/\\s+/g, '-');\nconst schemaVersion = body.schema_version || 'v1';\nconst sourceRecordId = body.source_record_id || 'no-source-id';\nreturn [{ json: { ...body, domain, company_name: companyName, schema_version: schemaVersion, valid, validation_error: valid ? null : 'company identity required', idempotency_key: `gtm:${schemaVersion}:${identity || 'invalid'}:${sourceRecordId}` } }];"
+      },
+      "id": "node-validate",
+      "name": "Validate & Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-if",
+      "name": "Valid Payload?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "q-status",
+              "name": "status",
+              "value": "quarantined",
+              "type": "string"
+            },
+            {
+              "id": "q-reason",
+              "name": "reason",
+              "value": "={{ $json.validation_error }}",
+              "type": "string"
+            },
+            {
+              "id": "q-key",
+              "name": "idempotency_key",
+              "value": "={{ $json.idempotency_key }}",
+              "type": "string"
+            },
+            {
+              "id": "q-payload",
+              "name": "payload",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-quarantine",
+      "name": "Quarantine Invalid",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GTM_ENGINE_SCORE_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Idempotency-Key",
+              "value": "={{ $json.idempotency_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "node-score",
+      "name": "Score via GTM Engine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -240,
+        -120
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $json;\nconst total = Number(item.score?.total ?? item.total ?? 0);\nlet tier = item.routing?.tier;\nlet action = item.routing?.action;\nif (!tier) {\n  if (total >= 80) { tier = 'A'; action = 'immediate_sales_routing'; }\n  else if (total >= 60) { tier = 'B'; action = 'targeted_outbound'; }\n  else if (total >= 40) { tier = 'C'; action = 'enrich_further'; }\n  else { tier = 'LOW'; action = 'low_priority'; }\n}\nreturn [{ json: { ...item, routing: { ...(item.routing || {}), tier, action } } }];"
+      },
+      "id": "node-tier",
+      "name": "Tier Routing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GTM_CRM_UPSERT_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Idempotency-Key",
+              "value": "={{ $json.idempotency_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "node-crm",
+      "name": "CRM Upsert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        -120
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a-status",
+              "name": "workflow_status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "a-ts",
+              "name": "workflow_completed_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "a-result",
+              "name": "result",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-audit",
+      "name": "Audit Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        540,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        800,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "node-respond-quarantine",
+      "name": "Respond Quarantine",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        20,
+        240
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Clay Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate & Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Normalize": {
+      "main": [
+        [
+          {
+            "node": "Valid Payload?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Payload?": {
+      "main": [
+        [
+          {
+            "node": "Score via GTM Engine",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Quarantine Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quarantine Invalid": {
+      "main": [
+        [
+          {
+            "node": "Respond Quarantine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score via GTM Engine": {
+      "main": [
+        [
+          {
+            "node": "Tier Routing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Tier Routing": {
+      "main": [
+        [
+          {
+            "node": "CRM Upsert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM Upsert": {
+      "main": [
+        [
+          {
+            "node": "Audit Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Audit Success": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "sanitized-portfolio-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

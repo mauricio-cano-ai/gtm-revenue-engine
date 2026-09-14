@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gtm-revenue-engine"
+version = "0.1.0"
+description = "Production-style GTM orchestration with Clay, n8n, Python/pandas and CRM-ready scoring."
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2",
+  "pydantic>=2.8",
+  "PyYAML>=6.0",
+  "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+gtm-engine = "gtm_engine.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra"

@@ -1,0 +1,30 @@
+weights:
+  firmographic_fit: 25
+  technographic_fit: 15
+  hiring_signal: 15
+  funding_signal: 15
+  intent_signal: 20
+  behavioral_signal: 10
+freshness_days:
+  hiring_signal: 45
+  funding_signal: 120
+  intent_signal: 30
+  behavioral_signal: 14
+stale_multiplier: 0.35
+thresholds:
+  tier_a: 80
+  tier_b: 60
+  tier_c: 40
+routing:
+  tier_a:
+    action: immediate_sales_routing
+    owner: senior_ae_queue
+  tier_b:
+    action: targeted_outbound
+    owner: growth_sdr_queue
+  tier_c:
+    action: enrich_further
+    owner: revops_enrichment_queue
+  low:
+    action: low_priority
+    owner: nurture_pool
